@@ -1,10 +1,10 @@
 import { lazy, Suspense, useState } from 'react'
-import { BookOpen, BrainCircuit, CheckCircle2, Settings } from 'lucide-react'
+import { BookOpen, BrainCircuit, CheckCircle2, Languages, Settings } from 'lucide-react'
 import { runAnalyst, runPlanner, runResearcher } from './agents/agents'
 import SetupForm from './components/SetupForm'
 import { Badge, Button, Card, Spinner } from './components/ui'
 import { modelInfo } from './config/models'
-import { toSafeErrorMessage } from './lib/errors'
+import { appCopy, formatAppError, UI_LANGUAGES } from './i18n'
 import { formatBrl } from './services/cost'
 import { useSettings } from './store'
 import type {
@@ -24,17 +24,10 @@ function LazyFallback() {
   )
 }
 
-const STEP_LABELS: Record<AppStep, string> = {
-  setup: 'Configuração',
-  preparing: 'Preparando',
-  ready: 'Pronto',
-  interview: 'Entrevista',
-  analyzing: 'Analisando',
-  report: 'Relatório',
-}
-
 export default function App() {
   const settings = useSettings()
+  const lang = settings.uiLanguage
+  const t = appCopy[lang]
   const [step, setStep] = useState<AppStep>('setup')
   const [showSettings, setShowSettings] = useState(false)
   const [showManual, setShowManual] = useState(false)
@@ -43,9 +36,9 @@ export default function App() {
   const [plan, setPlan] = useState<InterviewPlan | null>(null)
   const [report, setReport] = useState<ReportData | null>(null)
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([])
-  const [analysisError, setAnalysisError] = useState<string | null>(null)
+  const [analysisError, setAnalysisError] = useState<unknown | null>(null)
   const [loadingText, setLoadingText] = useState('')
-  const [errorText, setErrorText] = useState<string | null>(null)
+  const [errorText, setErrorText] = useState<unknown | null>(null)
   const [totalCostUsd, setTotalCostUsd] = useState(0)
 
   const handleStart = async (newConfig: InterviewConfig) => {
@@ -54,19 +47,19 @@ export default function App() {
     setTotalCostUsd(0)
     setStep('preparing')
     try {
-      setLoadingText('Agente Pesquisador analisando a empresa e a vaga…')
+      setLoadingText(t.loading.researcher)
       const research = await runResearcher(newConfig, settings.models.researcher, settings.keys)
       setBrief(research.data)
       setTotalCostUsd((c) => c + research.costUsd)
 
-      setLoadingText('Agente Planejador criando o roteiro adaptativo…')
+      setLoadingText(t.loading.planner)
       const planResult = await runPlanner(newConfig, research.data, settings.models.planner, settings.keys)
       setPlan(planResult.data)
       setTotalCostUsd((c) => c + planResult.costUsd)
 
       setStep('ready')
     } catch (e) {
-      setErrorText(toSafeErrorMessage(e, 'Erro ao preparar a entrevista.'))
+      setErrorText(e)
       setStep('setup')
     }
   }
@@ -81,11 +74,11 @@ export default function App() {
   const analyze = async (finalTranscript: TranscriptEntry[]) => {
     setStep('analyzing')
     setAnalysisError(null)
-    setLoadingText('Agente Analista auditando a transcrição e gerando o relatório…')
+    setLoadingText(t.loading.analyst)
     try {
-      if (!config || !plan) throw new Error('Estado da sessão perdido.')
+      if (!config || !plan) throw new Error('SESSION_STATE_LOST')
       const text = finalTranscript
-        .map((t) => `${t.role === 'candidate' ? 'Candidato' : 'Entrevistador'}: ${t.text}`)
+        .map((entry) => `${entry.role === 'candidate' ? t.transcriptRoles.candidate : t.transcriptRoles.interviewer}: ${entry.text}`)
         .join('\n')
       const analysis = await runAnalyst(config, plan, text, settings.models.analyst, settings.keys)
       setReport(analysis.data)
@@ -93,13 +86,13 @@ export default function App() {
       setStep('report')
     } catch (e) {
       // NÃO descarta a entrevista: mantém a transcrição e permite re-tentar.
-      setAnalysisError(toSafeErrorMessage(e, 'Erro ao gerar o relatório.'))
+      setAnalysisError(e)
     }
   }
 
   const copyTranscript = () => {
     const text = transcript
-      .map((t) => `${t.role === 'candidate' ? 'Você' : 'Entrevistador'}: ${t.text}`)
+      .map((entry) => `${entry.role === 'candidate' ? t.transcriptRoles.you : t.transcriptRoles.interviewer}: ${entry.text}`)
       .join('\n')
     void navigator.clipboard?.writeText(text)
   }
@@ -125,22 +118,38 @@ export default function App() {
             </div>
             <div>
               <h1 className="font-bold leading-tight">Personal Interviewer <span className="text-indigo-400">Pro</span></h1>
-              <p className="text-[11px] text-slate-500 leading-tight">Simulador de entrevistas por voz · pt-BR & EN</p>
+              <p className="text-[11px] text-slate-500 leading-tight">{t.headerSubtitle}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <Badge tone="slate">{STEP_LABELS[step]}</Badge>
+            <Badge tone="slate">{t.steps[step]}</Badge>
+            <div className="flex items-center gap-1 rounded-xl bg-slate-900 border border-slate-800 px-1.5 py-1" title={t.languageButton}>
+              <Languages className="w-4 h-4 text-slate-400" />
+              {UI_LANGUAGES.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => settings.setUiLanguage(item.id)}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                    lang === item.id ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  aria-label={`${t.languageButton}: ${item.label}`}
+                >
+                  {item.short}
+                </button>
+              ))}
+            </div>
             <button
               onClick={() => setShowManual(true)}
               className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/60 hover:text-indigo-300 text-slate-300 transition-colors"
-              title="Guia & Manual de uso"
+              title={t.openManual}
             >
               <BookOpen className="w-5 h-5" />
             </button>
             <button
               onClick={() => setShowSettings(true)}
               className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-600 text-slate-300 transition-colors"
-              title="Configurações (chaves, modelos, prompt)"
+              title={t.openSettings}
             >
               <Settings className="w-5 h-5" />
             </button>
@@ -149,9 +158,11 @@ export default function App() {
       </header>
 
       <main className="flex-1 container mx-auto px-4 md:px-6 py-8">
-        {errorText && step === 'setup' && (
+        {errorText !== null && step === 'setup' && (
           <div className="max-w-4xl mx-auto mb-6">
-            <Card className="p-4 border-red-500/40 bg-red-950/30 text-sm text-red-300">{errorText}</Card>
+            <Card className="p-4 border-red-500/40 bg-red-950/30 text-sm text-red-300">
+              {formatAppError(errorText, lang, t.errors.preparing)}
+            </Card>
           </div>
         )}
 
@@ -162,7 +173,7 @@ export default function App() {
             <Spinner className="w-14 h-14 text-indigo-500" />
             <h2 className="text-lg font-semibold text-slate-200 animate-pulse">{loadingText}</h2>
             <p className="text-xs text-slate-500">
-              Custo acumulado: {formatBrl(totalCostUsd, settings.usdToBrl)} (est.)
+              {t.loading.accumulatedCost} {formatBrl(totalCostUsd, settings.usdToBrl)} {t.loading.estimated}
             </p>
           </div>
         )}
@@ -172,31 +183,29 @@ export default function App() {
             <Spinner className="w-14 h-14 text-indigo-500" />
             <h2 className="text-lg font-semibold text-slate-200 animate-pulse">{loadingText}</h2>
             <p className="text-xs text-slate-500">
-              Custo acumulado: {formatBrl(totalCostUsd, settings.usdToBrl)} (est.)
+              {t.loading.accumulatedCost} {formatBrl(totalCostUsd, settings.usdToBrl)} {t.loading.estimated}
             </p>
           </div>
         )}
 
-        {step === 'analyzing' && analysisError && (
+        {step === 'analyzing' && analysisError !== null && (
           <div className="max-w-xl mx-auto py-12 text-center space-y-6">
             <div className="bg-amber-500/15 border border-amber-500/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto">
               <BrainCircuit className="w-8 h-8 text-amber-400" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold">Falha ao gerar o relatório</h2>
+              <h2 className="text-2xl font-bold">{t.errors.reportFailedTitle}</h2>
               <p className="text-slate-400 mt-2 text-sm">
-                Sua entrevista <strong className="text-slate-200">não foi perdida</strong> — a transcrição
-                ({transcript.length} turnos) está salva. Você pode tentar gerar o relatório de novo ou copiar
-                a transcrição para guardar.
+                {t.errors.reportFailedBody} ({transcript.length})
               </p>
             </div>
             <Card className="p-4 border-amber-500/30 bg-amber-950/20 text-left text-xs text-amber-200/90 break-words">
-              {analysisError}
+              {formatAppError(analysisError, lang, t.errors.analyzing)}
             </Card>
             <div className="flex flex-wrap gap-3 justify-center">
-              <Button onClick={() => void analyze(transcript)}>Tentar gerar relatório novamente</Button>
-              <Button variant="secondary" onClick={copyTranscript}>Copiar transcrição</Button>
-              <Button variant="ghost" onClick={handleRestart}>Voltar ao início</Button>
+              <Button onClick={() => void analyze(transcript)}>{t.errors.retryReport}</Button>
+              <Button variant="secondary" onClick={copyTranscript}>{t.errors.copyTranscript}</Button>
+              <Button variant="ghost" onClick={handleRestart}>{t.errors.backStart}</Button>
             </div>
           </div>
         )}
@@ -207,24 +216,24 @@ export default function App() {
               <CheckCircle2 className="w-10 h-10 text-emerald-400" />
             </div>
             <div>
-              <h2 className="text-3xl font-bold">Tudo pronto!</h2>
+              <h2 className="text-3xl font-bold">{t.ready.title}</h2>
               <p className="text-slate-400 mt-2">
-                Empresa identificada: <strong className="text-slate-200">{brief.company_identification?.company_name || 'inferida do JD'}</strong>
+                {t.ready.company} <strong className="text-slate-200">{brief.company_identification?.company_name || t.ready.inferredCompany}</strong>
                 <br />
-                Roteiro de nível <strong className="text-indigo-400 capitalize">{plan.metadata?.seniority_inferred?.level || 'padrão'}</strong>
+                {t.ready.planLevel} <strong className="text-indigo-400 capitalize">{plan.metadata?.seniority_inferred?.level || t.ready.defaultLevel}</strong>
                 {' · '}{config.duration} min{' · '}
-                {config.interviewLanguage === 'en-US' ? '🇺🇸 inglês' : '🇧🇷 português'}
+                {config.interviewLanguage === 'en-US' ? `🇺🇸 ${t.ready.english}` : `🇧🇷 ${t.ready.portuguese}`}
               </p>
             </div>
             <Card className="p-5 text-left text-sm space-y-1.5">
-              <p className="text-slate-300"><strong>Tom:</strong> {brief.interview_style_profile?.tone || 'Neutro'}</p>
-              <p className="text-slate-300"><strong>Rigor:</strong> {brief.interview_style_profile?.strictness_level ?? '?'}/5</p>
-              <p className="text-slate-300"><strong>Voz:</strong> {config.voiceName} · <strong>Engine:</strong> {modelInfo(settings.models.interviewer)?.label}</p>
-              <p className="text-slate-300"><strong>Blocos:</strong> {plan.interview_plan.blocks.map((b) => b.name).join(' → ')}</p>
-              <p className="text-xs text-slate-500 pt-1">Custo de preparação: {formatBrl(totalCostUsd, settings.usdToBrl)} (est.)</p>
+              <p className="text-slate-300"><strong>{t.ready.tone}:</strong> {brief.interview_style_profile?.tone || t.ready.neutral}</p>
+              <p className="text-slate-300"><strong>{t.ready.strictness}:</strong> {brief.interview_style_profile?.strictness_level ?? '?'}/5</p>
+              <p className="text-slate-300"><strong>{t.ready.voice}:</strong> {config.voiceName} · <strong>{t.ready.engine}:</strong> {modelInfo(settings.models.interviewer)?.label}</p>
+              <p className="text-slate-300"><strong>{t.ready.blocks}:</strong> {plan.interview_plan.blocks.map((b) => b.name).join(' -> ')}</p>
+              <p className="text-xs text-slate-500 pt-1">{t.ready.prepCost} {formatBrl(totalCostUsd, settings.usdToBrl)} {t.loading.estimated}</p>
             </Card>
             <Button onClick={() => setStep('interview')} className="px-10 py-4 text-lg rounded-full">
-              🎙️ Começar entrevista
+              {t.ready.start}
             </Button>
           </div>
         )}

@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { DEFAULT_MODELS } from './config/models'
-import { DEFAULT_INTERVIEWER_TEMPLATE } from './config/prompts'
-import type { AgentRole, ApiKeys, ModelRef } from './types'
+import { DEFAULT_INTERVIEWER_TEMPLATE, DEFAULT_INTERVIEWER_TEMPLATES, isDefaultInterviewerTemplate } from './config/prompts'
+import type { AgentRole, ApiKeys, ModelRef, UiLanguage } from './types'
 
 export interface SettingsState {
   keys: ApiKeys
@@ -10,11 +10,13 @@ export interface SettingsState {
   interviewerTemplate: string
   extraInstructions: string
   usdToBrl: number
+  uiLanguage: UiLanguage
   setKey: (provider: keyof ApiKeys, value: string) => void
   setModel: (role: AgentRole, ref: ModelRef) => void
   setInterviewerTemplate: (t: string) => void
   setExtraInstructions: (t: string) => void
   setUsdToBrl: (v: number) => void
+  setUiLanguage: (v: UiLanguage) => void
   resetInterviewerTemplate: () => void
 }
 
@@ -26,19 +28,27 @@ export const useSettings = create<SettingsState>()(
       interviewerTemplate: DEFAULT_INTERVIEWER_TEMPLATE,
       extraInstructions: '',
       usdToBrl: 5.8,
+      uiLanguage: 'en-US',
       setKey: (provider, value) => set((s) => ({ keys: { ...s.keys, [provider]: value } })),
       setModel: (role, ref) => set((s) => ({ models: { ...s.models, [role]: ref } })),
       setInterviewerTemplate: (t) => set({ interviewerTemplate: t }),
       setExtraInstructions: (t) => set({ extraInstructions: t }),
       setUsdToBrl: (v) => set({ usdToBrl: v }),
-      resetInterviewerTemplate: () => set({ interviewerTemplate: DEFAULT_INTERVIEWER_TEMPLATE }),
+      setUiLanguage: (v) => set((s) => ({
+        uiLanguage: v,
+        interviewerTemplate: isDefaultInterviewerTemplate(s.interviewerTemplate)
+          ? DEFAULT_INTERVIEWER_TEMPLATES[v]
+          : s.interviewerTemplate,
+      })),
+      resetInterviewerTemplate: () => set((s) => ({ interviewerTemplate: DEFAULT_INTERVIEWER_TEMPLATES[s.uiLanguage] })),
     }),
     {
       name: 'pip-settings-v1',
-      version: 4,
+      version: 6,
       migrate: (persisted, version) => {
         const state = persisted as Partial<SettingsState>
         let models = state.models ? { ...state.models } : { ...DEFAULT_MODELS }
+        const uiLanguage = state.uiLanguage ?? 'en-US'
         // v2: padrão passou a priorizar qualidade máxima por função (Opus 4.8 / Fable 5).
         if (version < 2) models = { ...DEFAULT_MODELS }
         // v4: modelos Live antigos (2.0-flash-live-001, live-2.5-preview, native-audio-09-2025)
@@ -55,7 +65,10 @@ export const useSettings = create<SettingsState>()(
             }
           }
         }
-        return { ...state, models }
+        const interviewerTemplate = isDefaultInterviewerTemplate(state.interviewerTemplate)
+          ? DEFAULT_INTERVIEWER_TEMPLATES[uiLanguage]
+          : state.interviewerTemplate ?? DEFAULT_INTERVIEWER_TEMPLATES[uiLanguage]
+        return { ...state, uiLanguage, interviewerTemplate, models }
       },
     },
   ),

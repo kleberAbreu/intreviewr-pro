@@ -16,7 +16,7 @@ export interface ChatResult {
 
 function requireKey(value: string, label: string): string {
   if (!value?.trim()) {
-    throw new Error(`Chave de API ${label} não configurada. Abra Configurações → Chaves de API.`)
+    throw new Error(`MISSING_API_KEY:${label}`)
   }
   return value.trim()
 }
@@ -132,7 +132,7 @@ export async function chatJson(p: ChatParams): Promise<ChatResult> {
         p,
         'https://openrouter.ai/api/v1',
         requireKey(p.keys.openrouter, 'OpenRouter'),
-        { 'HTTP-Referer': 'https://github.com/kleberAbreu/personal-interviewer-pro', 'X-Title': 'Personal Interviewer Pro' },
+        { 'HTTP-Referer': 'https://github.com/kleberAbreu/intreviewr-pro', 'X-Title': 'Personal Interviewer Pro' },
         false,
       )
     case 'anthropic':

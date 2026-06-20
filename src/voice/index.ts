@@ -13,6 +13,6 @@ export function startVoiceSession(
   if (ref.provider === 'openai') return startOpenAiRealtime(opts, cb)
   if (ref.provider === 'gemini') return startGeminiLive(opts, cb)
   return Promise.reject(
-    new Error('O entrevistador por voz requer um modelo Gemini Live ou OpenAI Realtime. Ajuste em Configurações → Modelos.'),
+    new Error('The voice interviewer requires a Gemini Live or OpenAI Realtime model. Adjust this in Settings -> Models.'),
   )
 }

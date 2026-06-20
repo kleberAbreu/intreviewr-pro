@@ -1,89 +1,86 @@
 # Personal Interviewer Pro
 
-Simulador de entrevistas de emprego **por voz** com IA — evolução do projeto [personal-interviewer](https://github.com/kleberAbreu/Personal-Interviewer), reescrito do zero com arquitetura multi-provider, entrevista em **português ou inglês** e relatório crítico baseado em evidências.
+Voice-based AI interview practice for job candidates. Paste a job description,
+choose the interview language, speak with a real-time AI interviewer, and receive
+an evidence-based performance report with strengths, gaps, quotes, and a two-week
+practice plan.
 
-> **Status deste repositório público:** este repo é uma publicação de código-fonte
-> para estudo, portfólio e uso local. Não há demo pública oficial hospedada.
-> Se você publicar uma instância online, mova as chamadas de IA para um backend
-> antes de aceitar usuários externos.
+> **Public repository status:** this repository is source code for study,
+> portfolio, and local use. There is no official hosted public demo. If you host
+> it for other users, move provider calls behind a backend/proxy before accepting
+> external traffic.
 
-> 👋 **É a primeira vez aqui ou não é da área de tecnologia?** Leia o
-> **[📖 Manual do Usuário](MANUAL.md)** — um guia amigável, sem termos técnicos,
-> que explica como configurar, usar e tirar o máximo do app para se preparar para
-> entrevistas de emprego.
+## Highlights
 
-## Como funciona
+- **Multi-provider pipeline:** choose Google Gemini, OpenAI, Anthropic, or
+  OpenRouter independently for the Researcher, Planner, Interviewer, and Analyst
+  roles.
+- **Real-time voice interview:** Gemini Live or OpenAI Realtime runs the spoken
+  interview with live transcription and barge-in.
+- **Interface language switcher:** the app UI and in-app manual can be switched
+  between English and Portuguese from the header.
+- **Independent interview/report languages:** practice in English and read the
+  report in Portuguese, or keep both in the same language.
+- **Custom interviewer prompt:** add quick instructions or edit the full prompt
+  template from Settings.
+- **Cost visibility:** text costs use provider token counts when available; voice
+  costs are estimated from audio duration.
 
-```
-Setup (vaga + CV + idioma + pesos)
-   │
-   ▼
-🔍 Pesquisador  ──► Company Brief (cultura, valores, estilo de entrevista)
-   │
-   ▼
-🗺️ Planejador   ──► Roteiro adaptativo em blocos cronometrados + rubrica
-   │
-   ▼
-🎙️ Entrevistador ──► Conversa por VOZ em tempo real (Gemini Live ou OpenAI Realtime)
-   │                  follow-ups dinâmicos, modo stress, encerramento automático via tool call
-   ▼
-📊 Analista     ──► Relatório: nota ponderada, forças/gaps com citações literais,
-                    momentos-chave, feedback por pergunta, plano de treino de 2 semanas
-```
+## Running Locally
 
-## Diferenciais sobre o projeto original
-
-- **Multi-provider**: cada função (Pesquisador, Planejador, Entrevistador, Analista) pode usar um modelo diferente — **Google Gemini, OpenAI, Anthropic** ou **OpenRouter** (uma chave única que dá acesso a todos os modelos, incluindo fallbacks econômicos como DeepSeek).
-- **Painel de Modelos com sugestões**: para cada função, o app recomenda o modelo com melhor custo/qualidade e explica o porquê (ex.: Claude Opus 4.8 no Analista, onde a inteligência importa; modelos baratos no Pesquisador, onde não importa).
-- **Entrevista em inglês** 🇺🇸: o entrevistador conduz toda a sessão em inglês nativo — ideal para treinar processos internacionais. O relatório pode continuar em português.
-- **Transcrição dos dois lados**: o app original só transcrevia o entrevistador (o Analista avaliava uma entrevista quase vazia). Aqui a fala do candidato é transcrita (input transcription no Gemini Live / Whisper no OpenAI Realtime) — o relatório avalia o que você realmente disse.
-- **Prompt do entrevistador 100% customizável**: edite o template completo (com placeholders) ou apenas anexe instruções extras, direto na UI.
-- **Custo real por tokens**: usa os contadores oficiais de cada API (não estimativa por caracteres) + estimativa de áudio por duração, exibido em R$ em todas as telas.
-- **Voz com barge-in**: interrompa o entrevistador falando por cima, como numa conversa real.
-
-## Rodando localmente
-
-Pré-requisito: Node.js 20+
+Prerequisite: Node.js 20 or newer.
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-Abra o app, clique em **⚙ Configurações → Chaves de API** e cole as chaves dos provedores que for usar (ficam só no `localStorage` do navegador):
+Open the local URL printed by Vite. Then open **Settings -> API keys** and paste
+only the provider keys you plan to use. Keys are stored in this browser's
+`localStorage`.
 
-| Provedor   | Para quê                                        | Onde obter                       |
-|------------|--------------------------------------------------|----------------------------------|
-| Gemini     | Voz (Gemini Live) + agentes de texto             | aistudio.google.com/apikey       |
-| OpenAI     | Voz em inglês (Realtime API) + GPT               | platform.openai.com/api-keys     |
-| Anthropic  | Analista de alta qualidade (Claude Opus/Fable)   | console.anthropic.com            |
-| OpenRouter | Chave única para Claude/GPT/Gemini/DeepSeek      | openrouter.ai/keys               |
+| Provider | Used for | Where to get a key |
+| --- | --- | --- |
+| Gemini | Gemini Live voice and text agents | aistudio.google.com/apikey |
+| OpenAI | GPT text models and Realtime voice | platform.openai.com/api-keys |
+| Anthropic | High-quality planning and analysis | console.anthropic.com |
+| OpenRouter | One key for many text models | openrouter.ai/keys |
 
-O padrão de fábrica prioriza **qualidade máxima** por função: Claude Opus 4.8 (Pesquisador e Planejador), Claude Fable 5 (Analista) e Gemini Live (voz) — ou seja, requer as chaves **Anthropic + Gemini**. Alternativas mais econômicas (ou tudo-Gemini com uma chave só) estão a um clique em **Configurações → Modelos**.
+The default quality-focused setup uses Anthropic for text agents and Gemini for
+voice. For the simplest start, configure Gemini and switch the text roles to
+Gemini models in **Settings -> Models**.
 
-## Estrutura
+## Project Structure
 
-```
+```text
 src/
-├── agents/agents.ts        # Pesquisador, Planejador, Analista
-├── providers/llm.ts        # Abstração Gemini/OpenAI/Anthropic/OpenRouter
-├── voice/
-│   ├── geminiLive.ts       # Sessão de voz via Gemini Live API
-│   ├── openaiRealtime.ts   # Sessão de voz via OpenAI Realtime API (WebSocket)
-│   └── audio.ts            # Captura de mic PCM16 + player com fila e barge-in
-├── config/
-│   ├── models.ts           # Catálogo de modelos, preços e sugestões por função
-│   └── prompts.ts          # Prompts dos agentes + template editável do entrevistador
-├── components/             # SetupForm, LiveInterview, ReportView, SettingsPanel
-├── services/cost.ts        # Custo por tokens reais + estimativa de áudio
-└── store.ts                # Settings persistidas (zustand)
+  agents/            Researcher, Planner, and Analyst orchestration
+  components/        Setup, live interview, settings, manual, and report UI
+  config/            Model catalog and prompts
+  i18n.ts            English/Portuguese interface copy
+  providers/         Gemini, OpenAI, Anthropic, and OpenRouter text calls
+  services/          Cost calculation helpers
+  voice/             Gemini Live, OpenAI Realtime, and browser audio helpers
+  store.ts           Persisted settings
 ```
 
-## Avisos
+## Security And Privacy Notes
 
-- As chamadas saem direto do navegador (chaves no cliente). Adequado para uso pessoal; para publicar na internet, mova as chamadas para um backend/proxy.
-- A autenticação da OpenAI Realtime usa o subprotocolo `openai-insecure-api-key` (modo dev). Em produção, gere tokens efêmeros num backend.
-- Preços dos modelos em `src/config/models.ts` — Anthropic oficiais (jun/2026), demais estimados; ajuste quando mudarem.
-- A descrição da vaga, CV, áudio, transcrição e relatório são enviados aos provedores escolhidos pelo usuário. Evite colar dados pessoais sensíveis ou informações confidenciais de empresas.
-- Configure limites de gasto e chaves restritas nos provedores. Para Gemini, prefira as auth keys/restrições atuais do Google AI Studio; para OpenAI Realtime em produção, use credenciais efêmeras geradas no servidor.
-- Este pacote mantém `"private": true` no `package.json` para evitar publicação acidental no npm; isso não impede o repositório GitHub de ser público.
+- This app sends provider calls directly from the browser. That is suitable for
+  personal/local use; production deployments should use a backend/proxy.
+- The OpenAI Realtime browser flow should use ephemeral server-generated
+  credentials in production.
+- Job descriptions, resumes, audio, transcripts, and reports are sent to the
+  providers selected by the user. Avoid pasting confidential material, trade
+  secrets, or sensitive personal data.
+- Configure provider-side spend limits and key restrictions.
+- `package.json` intentionally keeps `"private": true` to prevent accidental npm
+  publication. The GitHub repository can still be public.
+
+## Quality Checks
+
+```bash
+npm run lint
+npm run build
+npm audit --omit=dev
+```

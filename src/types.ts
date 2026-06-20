@@ -1,6 +1,7 @@
 export type Provider = 'gemini' | 'openai' | 'anthropic' | 'openrouter'
 export type AgentRole = 'researcher' | 'planner' | 'interviewer' | 'analyst'
 export type Language = 'pt-BR' | 'en-US'
+export type UiLanguage = Language
 export type Area = 'Software' | 'Produto' | 'Dados' | 'Comercial' | 'Outra'
 export type InterviewType = 'RH' | 'Tecnica' | 'Case' | 'Mista'
 export type AppStep = 'setup' | 'preparing' | 'ready' | 'interview' | 'analyzing' | 'report'

@@ -1,7 +1,7 @@
 {
   "name": "intreviewr-pro",
   "private": true,
-  "description": "Simulador de entrevistas por voz multi-provider para treino pessoal.",
+  "description": "Multi-provider voice interview simulator for personal interview practice.",
   "version": "0.0.0",
   "type": "module",
   "scripts": {

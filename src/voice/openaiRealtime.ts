@@ -1,12 +1,12 @@
 import { b64Decode, b64Encode, floatTo16BitPcmBytes, MicCapture, PcmPlayer } from './audio'
 import type { VoiceCallbacks, VoiceSession, VoiceSessionOptions } from './types'
 
-// Sessão de voz via OpenAI Realtime API (WebSocket direto do navegador).
-// Áudio PCM16 mono 24kHz nos dois sentidos; transcrição do candidato via
-// input_audio_transcription e do entrevistador via audio_transcript.
+// Voice session through OpenAI Realtime API (direct browser WebSocket).
+// PCM16 mono 24kHz audio in both directions; candidate transcript via
+// input_audio_transcription and interviewer transcript via audio_transcript.
 //
-// Nota: a autenticação usa o subprotocolo "openai-insecure-api-key" —
-// adequado para uso pessoal/local; em produção usaria token efêmero via backend.
+// Note: authentication uses the "openai-insecure-api-key" subprotocol.
+// Suitable for personal/local use; production should use ephemeral backend tokens.
 export async function startOpenAiRealtime(
   opts: VoiceSessionOptions,
   cb: VoiceCallbacks,
@@ -28,9 +28,8 @@ export async function startOpenAiRealtime(
 
   ws.onopen = () => {
     if (closed) return
-    // Estrutura GA da Realtime API (modelo gpt-realtime): config de áudio
-    // aninhada em audio.input/output e output_modalities (não mais os campos
-    // planos modalities/voice/input_audio_format do antigo gpt-4o-realtime-preview).
+    // GA Realtime API structure (gpt-realtime): audio config is nested under
+    // audio.input/output and output_modalities, replacing older flat fields.
     send({
       type: 'session.update',
       session: {
@@ -59,7 +58,7 @@ export async function startOpenAiRealtime(
         ],
       },
     })
-    // Faz o entrevistador abrir a conversa
+    // Ask the interviewer to open the conversation.
     send({ type: 'response.create' })
 
     opened = true
@@ -70,7 +69,7 @@ export async function startOpenAiRealtime(
       for (let i = 0; i < chunk.length; i++) sum += chunk[i] * chunk[i]
       cb.onAudioLevel(Math.sqrt(sum / chunk.length))
       send({ type: 'input_audio_buffer.append', audio: b64Encode(floatTo16BitPcmBytes(chunk)) })
-    }).catch((e: unknown) => cb.onError(e instanceof Error ? e.message : 'Falha ao acessar o microfone'))
+    }).catch((e: unknown) => cb.onError(e instanceof Error ? e.message : 'Could not access the microphone'))
   }
 
   ws.onmessage = (event) => {
@@ -83,7 +82,7 @@ export async function startOpenAiRealtime(
     }
     const type = String(msg.type ?? '')
 
-    // Áudio do entrevistador (nomes variam entre versões beta/GA da API)
+    // Interviewer audio (event names vary between beta/GA API versions).
     if (type === 'response.audio.delta' || type === 'response.output_audio.delta') {
       const bytes = b64Decode(String(msg.delta ?? ''))
       cb.onAudioSeconds(0, bytes.length / 2 / 24000)
@@ -91,27 +90,27 @@ export async function startOpenAiRealtime(
       return
     }
 
-    // Transcrição do entrevistador (turno completo)
+    // Interviewer transcript (full turn).
     if (type === 'response.audio_transcript.done' || type === 'response.output_audio_transcript.done') {
       const text = String(msg.transcript ?? '').trim()
       if (text) cb.onTranscript('interviewer', text)
       return
     }
 
-    // Transcrição do candidato
+    // Candidate transcript.
     if (type === 'conversation.item.input_audio_transcription.completed') {
       const text = String(msg.transcript ?? '').trim()
       if (text) cb.onTranscript('candidate', text)
       return
     }
 
-    // Barge-in: usuário começou a falar enquanto o modelo tocava áudio
+    // Barge-in: user started speaking while model audio was playing.
     if (type === 'input_audio_buffer.speech_started') {
       player.interrupt()
       return
     }
 
-    // Tool call de encerramento
+    // Closing tool call.
     if (type === 'response.function_call_arguments.done' && msg.name === 'end_interview' && !endRequested) {
       endRequested = true
       cb.onEndRequested(player.remainingSeconds())
@@ -128,12 +127,12 @@ export async function startOpenAiRealtime(
 
     if (type === 'error') {
       const err = msg.error as { message?: string } | undefined
-      cb.onError(err?.message ?? 'Erro na OpenAI Realtime API')
+      cb.onError(err?.message ?? 'OpenAI Realtime API error')
     }
   }
 
   ws.onerror = () => {
-    if (!closed && !opened) cb.onError('Falha ao conectar à OpenAI Realtime API. Verifique a chave OpenAI.')
+    if (!closed && !opened) cb.onError('Could not connect to the OpenAI Realtime API. Check the OpenAI key.')
   }
   ws.onclose = () => {
     if (!closed) cb.onClose()
@@ -150,7 +149,7 @@ export async function startOpenAiRealtime(
       closed = true
       mic.stop()
       player.close()
-      try { ws.close() } catch { /* já fechado */ }
+      try { ws.close() } catch { /* already closed */ }
     },
   }
 }

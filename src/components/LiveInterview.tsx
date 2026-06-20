@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertCircle, Clock, DollarSign, Mic, MicOff, NotebookPen, Pause, PhoneOff, Play, RefreshCw } from 'lucide-react'
 import { buildInterviewerPrompt } from '../config/prompts'
+import { liveCopy } from '../i18n'
 import { sanitizeErrorMessage, toSafeErrorMessage } from '../lib/errors'
 import { voiceCostUsd, formatBrl } from '../services/cost'
 import { useSettings } from '../store'
@@ -18,6 +19,7 @@ interface Props {
 
 export default function LiveInterview({ config, brief, plan, previousCostUsd, onFinish }: Props) {
   const settings = useSettings()
+  const t = liveCopy[settings.uiLanguage]
   const [connected, setConnected] = useState(false)
   const [muted, setMuted] = useState(false)
   const [paused, setPaused] = useState(false)
@@ -55,8 +57,8 @@ export default function LiveInterview({ config, brief, plan, previousCostUsd, on
     if (!apiKey?.trim()) {
       setError(
         interviewerRef.provider === 'openai'
-          ? 'Chave OpenAI não configurada (Configurações → Chaves de API).'
-          : 'Chave Gemini não configurada (Configurações → Chaves de API).',
+          ? t.missingOpenAi
+          : t.missingGemini,
       )
       return
     }
@@ -105,7 +107,7 @@ export default function LiveInterview({ config, brief, plan, previousCostUsd, on
         onClose: () => setConnected(false),
       })
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'Falha ao conectar'))
+      setError(toSafeErrorMessage(e, t.connectFailed))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -172,7 +174,7 @@ export default function LiveInterview({ config, brief, plan, previousCostUsd, on
         </div>
         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-emerald-400 rounded-xl text-xs font-mono border border-slate-800">
           <DollarSign className="w-3.5 h-3.5" />
-          {totalBrl} <span className="text-slate-600">(est.)</span>
+          {totalBrl} <span className="text-slate-600">{t.estimated}</span>
         </div>
       </div>
 
@@ -201,15 +203,15 @@ export default function LiveInterview({ config, brief, plan, previousCostUsd, on
 
       <div className="text-center">
         <h2 className="text-2xl font-bold">
-          {!connected ? 'Conectando…' : paused ? 'Entrevista pausada' : 'Entrevista em andamento'}
+          {!connected ? t.connecting : paused ? t.paused : t.running}
         </h2>
         <p className="text-slate-400 mt-1 text-sm max-w-md">
           {paused
-            ? 'Pausado — o entrevistador não está te ouvindo e o tempo está congelado. Faça suas anotações e retome quando quiser.'
+            ? t.pausedBody
             : config.interviewLanguage === 'en-US'
-              ? 'The interviewer is listening. Speak naturally in English.'
-              : 'O entrevistador está te ouvindo. Fale naturalmente.'}
-          {!paused && overtime && ' Tempo extra para finalizar.'}
+              ? t.listeningEn
+              : t.listeningPt}
+          {!paused && overtime && t.overtime}
         </p>
       </div>
 
@@ -220,7 +222,7 @@ export default function LiveInterview({ config, brief, plan, previousCostUsd, on
             {error}
           </div>
           <Button variant="danger" onClick={() => void connect()}>
-            <span className="flex items-center gap-2"><RefreshCw className="w-4 h-4" /> Tentar novamente</span>
+            <span className="flex items-center gap-2"><RefreshCw className="w-4 h-4" /> {t.retry}</span>
           </Button>
         </Card>
       )}
@@ -230,7 +232,7 @@ export default function LiveInterview({ config, brief, plan, previousCostUsd, on
           <button
             onClick={toggleMute}
             disabled={paused}
-            title={muted ? 'Reativar microfone' : 'Silenciar microfone'}
+            title={muted ? t.unmute : t.mute}
             className={`p-4 rounded-full border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
               muted ? 'bg-red-500/20 border-red-500/50 text-red-300' : 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700'
             }`}
@@ -244,11 +246,11 @@ export default function LiveInterview({ config, brief, plan, previousCostUsd, on
             className="rounded-full px-6"
           >
             <span className="flex items-center gap-2">
-              {paused ? <><Play className="w-5 h-5" /> Retomar</> : <><Pause className="w-5 h-5" /> Pausar</>}
+              {paused ? <><Play className="w-5 h-5" /> {t.resume}</> : <><Pause className="w-5 h-5" /> {t.pause}</>}
             </span>
           </Button>
           <Button variant="danger" onClick={finish} className="rounded-full px-6">
-            <span className="flex items-center gap-2"><PhoneOff className="w-5 h-5" /> Encerrar entrevista</span>
+            <span className="flex items-center gap-2"><PhoneOff className="w-5 h-5" /> {t.end}</span>
           </Button>
         </div>
       )}
@@ -257,13 +259,13 @@ export default function LiveInterview({ config, brief, plan, previousCostUsd, on
       {paused && (
         <Card className="w-full p-4 border-amber-500/30 bg-amber-950/10 space-y-2">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-300/90">
-            <NotebookPen className="w-4 h-4" /> Suas anotações
+            <NotebookPen className="w-4 h-4" /> {t.notes}
           </div>
           <textarea
             autoFocus
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Anote aqui o que quiser durante a pausa… (fica salvo enquanto a entrevista estiver aberta)"
+            placeholder={t.notesPlaceholder}
             className="w-full h-32 resize-y bg-slate-950/60 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           />
         </Card>
@@ -271,10 +273,10 @@ export default function LiveInterview({ config, brief, plan, previousCostUsd, on
 
       <Card className="w-full p-0 overflow-hidden">
         <div className="px-4 py-2.5 border-b border-slate-800 text-xs font-semibold uppercase tracking-wider text-slate-500">
-          Transcrição ao vivo
+          {t.transcript}
         </div>
         <div ref={logRef} className="h-56 overflow-y-auto p-4 space-y-3 text-sm">
-          {transcript.length === 0 && <p className="text-slate-600 italic">Aguardando áudio…</p>}
+          {transcript.length === 0 && <p className="text-slate-600 italic">{t.waitingAudio}</p>}
           {transcript.map((t, i) => (
             <div key={i} className={`flex ${t.role === 'candidate' ? 'justify-end' : 'justify-start'}`}>
               <div
@@ -285,7 +287,7 @@ export default function LiveInterview({ config, brief, plan, previousCostUsd, on
                 }`}
               >
                 <span className="block text-[10px] uppercase tracking-wider opacity-60 mb-0.5">
-                  {t.role === 'candidate' ? 'Você' : 'Entrevistador'}
+                  {t.role === 'candidate' ? liveCopy[settings.uiLanguage].you : liveCopy[settings.uiLanguage].interviewer}
                 </span>
                 {t.text}
               </div>
